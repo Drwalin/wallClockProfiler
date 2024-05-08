@@ -6,167 +6,163 @@
 #include "SimpleVector.hpp"
 
 // These came from:
-//#include "minorGems/util/stringUtils.h"
+// #include "minorGems/util/stringUtils.h"
 
-[[maybe_unused]] inline static char *stringDuplicate( const char *inString ) {
-    
-    char *returnBuffer = new char[ strlen( inString ) + 1 ];
+[[maybe_unused]] inline static char *stringDuplicate(const char *inString)
+{
 
-    strcpy( returnBuffer, inString );
+	char *returnBuffer = new char[strlen(inString) + 1];
 
-    return returnBuffer;    
-    }
+	strcpy(returnBuffer, inString);
 
-[[maybe_unused]] inline static char **split( const char *inString, const char *inSeparator, 
-              int *outNumParts ) {
-    SimpleVector<char *> *parts = new SimpleVector<char *>();
-    
-    char *workingString = stringDuplicate( inString );
-    char *workingStart = workingString;
+	return returnBuffer;
+}
 
-    unsigned int separatorLength = strlen( inSeparator );
+[[maybe_unused]] inline static char **
+split(const char *inString, const char *inSeparator, int *outNumParts)
+{
+	SimpleVector<char *> *parts = new SimpleVector<char *>();
 
-    char *foundSeparator = strstr( workingString, inSeparator );
+	char *workingString = stringDuplicate(inString);
+	char *workingStart = workingString;
 
-    while( foundSeparator != NULL ) {
-        // terminate at separator        
-        foundSeparator[0] = '\0';
-        parts->push_back( stringDuplicate( workingString ) );
+	unsigned int separatorLength = strlen(inSeparator);
 
-        // skip separator
-        workingString = &( foundSeparator[ separatorLength ] );
-        foundSeparator = strstr( workingString, inSeparator );
-        }
+	char *foundSeparator = strstr(workingString, inSeparator);
 
-    // add the remaining part, even if it is the empty string
-    parts->push_back( stringDuplicate( workingString ) );
+	while (foundSeparator != NULL) {
+		// terminate at separator
+		foundSeparator[0] = '\0';
+		parts->push_back(stringDuplicate(workingString));
 
-                      
-    delete [] workingStart;
+		// skip separator
+		workingString = &(foundSeparator[separatorLength]);
+		foundSeparator = strstr(workingString, inSeparator);
+	}
 
-    *outNumParts = parts->size();
-    char **returnArray = parts->getElementArray();
-    
-    delete parts;
+	// add the remaining part, even if it is the empty string
+	parts->push_back(stringDuplicate(workingString));
 
-    return returnArray;
-    }
+	delete[] workingStart;
+
+	*outNumParts = parts->size();
+	char **returnArray = parts->getElementArray();
+
+	delete parts;
+
+	return returnArray;
+}
 
 // visual studio doesn't have va_copy
 // suggested fix here:
 // https://stackoverflow.com/questions/558223/va-copy-porting-to-visual-c
 #ifndef va_copy
-    #define va_copy( dest, src ) ( dest = src )
+#define va_copy(dest, src) (dest = src)
 #endif
 
-[[maybe_unused]] inline static char *vautoSprintf( const char* inFormatString, va_list inArgList ) {
-    
-    va_list argListCopyA;
-    
-    va_copy( argListCopyA, inArgList );
-    
+[[maybe_unused]] inline static char *vautoSprintf(const char *inFormatString,
+												  va_list inArgList)
+{
 
-    unsigned int bufferSize = 50;
+	va_list argListCopyA;
 
+	va_copy(argListCopyA, inArgList);
 
-    char *buffer = new char[ bufferSize ];
-    
-    int stringLength =
-        vsnprintf( buffer, bufferSize, inFormatString, inArgList );
+	unsigned int bufferSize = 50;
 
+	char *buffer = new char[bufferSize];
 
-    if( stringLength != -1 ) {
-        // follows C99 standard...
-        // stringLength is the length of the string that would have been
-        // written if the buffer was big enough
+	int stringLength = vsnprintf(buffer, bufferSize, inFormatString, inArgList);
 
-        //  not room for string and terminating \0 in bufferSize bytes
-        if( (unsigned int)stringLength >= bufferSize ) {
+	if (stringLength != -1) {
+		// follows C99 standard...
+		// stringLength is the length of the string that would have been
+		// written if the buffer was big enough
 
-            // need to reprint with a bigger buffer
-            delete [] buffer;
+		//  not room for string and terminating \0 in bufferSize bytes
+		if ((unsigned int)stringLength >= bufferSize) {
 
-            bufferSize = (unsigned int)( stringLength + 1 );
+			// need to reprint with a bigger buffer
+			delete[] buffer;
 
-            buffer = new char[ bufferSize ];
+			bufferSize = (unsigned int)(stringLength + 1);
 
-            // can simply use vsprintf now
-            vsprintf( buffer, inFormatString, argListCopyA );
-            
-            va_end( argListCopyA );
-            return buffer;
-            }
-        else {
-            // buffer was big enough
+			buffer = new char[bufferSize];
 
-            // trim the buffer to fit the string
-            char *returnString = stringDuplicate( buffer );
-            delete [] buffer;
-            
-            va_end( argListCopyA );
-            return returnString;
-            }
-        }
-    else {
-        // follows old ANSI standard
-        // -1 means the buffer was too small
+			// can simply use vsprintf now
+			vsprintf(buffer, inFormatString, argListCopyA);
 
-        // Note that some buggy non-C99 vsnprintf implementations
-        // (notably MinGW)
-        // do not return -1 if stringLength equals bufferSize (in other words,
-        // if there is not enough room for the trailing \0).
+			va_end(argListCopyA);
+			return buffer;
+		} else {
+			// buffer was big enough
 
-        // Thus, we need to check for both
-        //   (A)  stringLength == -1
-        //   (B)  stringLength == bufferSize
-        // below.
-        
-        // keep doubling buffer size until it's big enough
-        while( stringLength == -1 || 
-               (unsigned int)stringLength == bufferSize ) {
+			// trim the buffer to fit the string
+			char *returnString = stringDuplicate(buffer);
+			delete[] buffer;
 
-            delete [] buffer;
+			va_end(argListCopyA);
+			return returnString;
+		}
+	} else {
+		// follows old ANSI standard
+		// -1 means the buffer was too small
 
-            if( (unsigned int)stringLength == bufferSize ) {
-                // only occurs if vsnprintf implementation is buggy
+		// Note that some buggy non-C99 vsnprintf implementations
+		// (notably MinGW)
+		// do not return -1 if stringLength equals bufferSize (in other words,
+		// if there is not enough room for the trailing \0).
 
-                // might as well use the information, though
-                // (instead of doubling the buffer size again)
-                bufferSize = bufferSize + 1;
-                }
-            else {
-                // double buffer size again
-                bufferSize = 2 * bufferSize;
-                }
+		// Thus, we need to check for both
+		//   (A)  stringLength == -1
+		//   (B)  stringLength == bufferSize
+		// below.
 
-            buffer = new char[ bufferSize ];
-    
-            va_list argListCopyB;
-            va_copy( argListCopyB, argListCopyA );
-            
-            stringLength =
-                vsnprintf( buffer, bufferSize, inFormatString, argListCopyB );
+		// keep doubling buffer size until it's big enough
+		while (stringLength == -1 || (unsigned int)stringLength == bufferSize) {
 
-            va_end( argListCopyB );
-            }
+			delete[] buffer;
 
-        // trim the buffer to fit the string
-        char *returnString = stringDuplicate( buffer );
-        delete [] buffer;
+			if ((unsigned int)stringLength == bufferSize) {
+				// only occurs if vsnprintf implementation is buggy
 
-        va_end( argListCopyA );
-        return returnString;
-        }
-    }
+				// might as well use the information, though
+				// (instead of doubling the buffer size again)
+				bufferSize = bufferSize + 1;
+			} else {
+				// double buffer size again
+				bufferSize = 2 * bufferSize;
+			}
 
-[[maybe_unused]] inline static char *autoSprintf( const char* inFormatString, ... ) {
-    va_list argList;
-    va_start( argList, inFormatString );
-    
-    char *result = vautoSprintf( inFormatString, argList );
-    
-    va_end( argList );
-    
-    return result;
-    }
+			buffer = new char[bufferSize];
 
+			va_list argListCopyB;
+			va_copy(argListCopyB, argListCopyA);
+
+			stringLength =
+				vsnprintf(buffer, bufferSize, inFormatString, argListCopyB);
+
+			va_end(argListCopyB);
+		}
+
+		// trim the buffer to fit the string
+		char *returnString = stringDuplicate(buffer);
+		delete[] buffer;
+
+		va_end(argListCopyA);
+		return returnString;
+	}
+}
+
+[[maybe_unused]] inline static char *autoSprintf(const char *inFormatString,
+												 ...)
+{
+	va_list argList;
+	va_start(argList, inFormatString);
+
+	char *result = vautoSprintf(inFormatString, argList);
+
+	va_end(argList);
+
+	return result;
+}
