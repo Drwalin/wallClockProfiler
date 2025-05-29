@@ -1,28 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <string.h>
-#include <errno.h>
 #include <math.h>
-#include <fcntl.h>
-#include <sys/prctl.h>
-
 #include <time.h>
 #include <stdarg.h>
 
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/prctl.h>
 
-
-
-
-
+#include <thread>
+#include <string>
+#include <iostream>
+#include <vector>
 
 // **************************************
 // dependency code imported from minorGems
 
 // these came from:
 //#include "minorGems/util/SimpleVector.h"
-
 
 const int defaultStartSize = 2;
 
@@ -447,8 +445,7 @@ inline bool SimpleVector<unsigned char>::deleteStartElements(
 			
 		numFilledElements -= inNumToDelete;
 		return true;
-		}
-	else {				// not enough elements in vector
+	} else {				// not enough elements in vector
 		return false;
 		}
 	}
@@ -469,8 +466,7 @@ inline bool SimpleVector<char>::deleteStartElements(
 			
 		numFilledElements -= inNumToDelete;
 		return true;
-		}
-	else {				// not enough elements in vector
+	} else {				// not enough elements in vector
 		return false;
 		}
 	}
@@ -1027,8 +1023,7 @@ static int fillBufferWithResponse( const char *inWaitingFor = NULL ) {
                 // stop waiting for full response, program has exited
                 programExited = true;
                 return readSoFar;
-                }
-	    else if( readSoFar > 10 &&
+            } else if( readSoFar > 10 &&
                      strstr( readBuff, "A problem internal to GDB has been detected" ) != NULL ) {
                 programExited = true;
                 return readSoFar;
@@ -1079,7 +1074,7 @@ static void checkProgramExited() {
     }
 
 
-static void printGDBResponse() {
+void printGDBResponse() {
     int numRead = fillBufferWithResponse();
     
     if( numRead > 0 ) {
@@ -1090,7 +1085,7 @@ static void printGDBResponse() {
 
 
 
-static void printGDBResponseToFile( FILE *inFile ) {
+void printGDBResponseToFile( FILE *inFile ) {
     int numRead = fillBufferWithResponse();
     
     if( numRead > 0 ) {
@@ -1102,7 +1097,7 @@ static void printGDBResponseToFile( FILE *inFile ) {
 
 
 static void skipGDBResponse() {
-    int numRead = fillBufferWithResponse();
+    fillBufferWithResponse();
 
     if( anythingInReadBuff ) {
         log( "Skipping GDB response", readBuff );
@@ -1113,7 +1108,7 @@ static void skipGDBResponse() {
 
 
 static void waitForGDBInterruptResponse() {
-    int numRead = fillBufferWithResponse( "*stopped," );
+    fillBufferWithResponse( "*stopped," );
     
     if( anythingInReadBuff ) {
         log( "Waiting for interrupt response", readBuff );
@@ -1266,14 +1261,12 @@ static StackFrame parseFrame( char *inFrameString ) {
             unsigned int len = strcspn(start, "\"") + 1;
             newF.funcName = new char[ len ];
             strncpy(newF.funcName, start, len);
-            }
-        else if( strstr( vals[i], "file=\"" ) == vals[i] ) {
+    } else if( strstr( vals[i], "file=\"" ) == vals[i] ) {
             char *start = vals[i] + strlen("file=\"");
             unsigned int len = strcspn(start, "\"") + 1;
             newF.fileName = new char[ len ];
             strncpy(newF.fileName, start, len);
-            }
-        else if( strstr( vals[i], "line=" ) == vals[i] ) {
+    } else if( strstr( vals[i], "line=" ) == vals[i] ) {
             sscanf( vals[i], "line=\"%d\"", &newF.lineNum );
             }
         }
@@ -1542,10 +1535,14 @@ int main( int inNumArgs, char **inArgs ) {
     
     // else parent
     printf( "Forked GDB child on PID=%d\n", childPID );
+	
+	
+	char debugFileName[256];
+	scanf(debugFileName, "wcGDB.%s.log", inArgs[3]);
 
-    logFile = fopen( "wcGDBLog.txt", "w" );
-    
-    printf( "Logging GDB commands and responses to wcGDBLog.txt\n" );
+	logFile = fopen(debugFileName, "w");
+
+	printf("Logging GDB commands and responses to %s\n", debugFileName);
     
     
     //close unused pipe ends
@@ -1639,8 +1636,6 @@ int main( int inNumArgs, char **inArgs ) {
     
     printf( "Debugging program '%s'\n", inArgs[2] );
 
-    char rawProgramName[100];
-    
     char *endOfPath = strrchr( inArgs[2], '/' );
 
     char *fullProgName = progName;
@@ -1706,6 +1701,27 @@ int main( int inNumArgs, char **inArgs ) {
                 detatchSeconds );
         }
     
+	std::thread stdinThread([]() {
+		std::string s;
+		std::vector<std::string> exits = {"q", "exit", "stop", "quit"};
+		while (true) {
+			std::cin >> s;
+			for (char &c : s) {
+				c = tolower(c);
+			}
+
+			for (auto e : exits) {
+				if (e == s) {
+					programExited = true;
+					return;
+				}
+			}
+
+			printf("type stop to stop profiling\n\n\n");
+		}
+		programExited = true;
+	});
+	stdinThread.detach();
 
     while( !programExited &&
            ( detatchSeconds == -1 ||
